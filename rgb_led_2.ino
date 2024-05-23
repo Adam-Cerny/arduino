@@ -9,21 +9,27 @@ void setup() {
 }
 
 void loop() {
-  // počáteční a koncové hodnoty RGB
-  int startRed = 255, startGreen = 179, startBlue = 255;
-  int endRed = 0, endGreen = 0, endBlue = 0; 
-
-  // počet mezistupňů
   int steps = 20;
-
+  
+  // Červená
   for (int i = 0; i <= steps; i++) {
-    // vypočítání mezistupňů
-    int red = startRed + i * (endRed - startRed) / steps;
-    int green = startGreen + i * (endGreen - startGreen) / steps;
-    int blue = startBlue + i * (endBlue - startBlue) / steps;
-
-    color(red, green, blue); // nastavení barvy
-    delay(1000); // počkat 1s
+    int red = i * (255 / steps);
+    color(red, 0, 0);
+    delay(1000);
+  }
+  
+  // Zelená
+  for (int i = 0; i <= steps; i++) {
+    int green = i * (255 / steps);
+    color(0, green, 0);
+    delay(1000);
+  }
+  
+  // Modrá
+  for (int i = 0; i <= steps; i++) {
+    int blue = i * (255 / steps);
+    color(0, 0, blue);
+    delay(1000);
   }
 }
 
