@@ -1,0 +1,80 @@
+#include <WiFi.h>
+
+// Replace with your network credentials
+const char* ssid = "your-SSID";
+const char* password = "your-PASSWORD";
+
+// Set web server port number to 80
+WiFiServer server(80);
+
+// Variable to store the HTTP request
+String header;
+
+// GPIO pin where the LED is connected
+const int ledPin = 2;
+
+// Current state of the LED
+String ledState = "OFF";
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+
+  // Connect to Wi-Fi
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to WiFi. IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Start the server
+  server.begin();
+}
+
+void loop() {
+  WiFiClient client = server.available();
+
+  if (client) {
+    String currentLine = "";
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        header += c;
+
+        if (c == '\n') {
+          if (currentLine.length() == 0) {
+            if (header.indexOf("GET /LED=ON") >= 0) {
+              digitalWrite(ledPin, HIGH);
+              ledState = "ON";
+            } else if (header.indexOf("GET /LED=OFF") >= 0) {
+              digitalWrite(ledPin, LOW);
+              ledState = "OFF";
+            }
+
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println();
+            client.print("Click <a href=\"/LED=ON\">here</a> to turn the LED on.<br>");
+            client.print("Click <a href=\"/LED=OFF\">here</a> to turn the LED off.<br>");
+            client.print("LED is now ");
+            client.print(ledState);
+            client.println();
+            break;
+          } else {
+            currentLine = "";
+          }
+        } else if (c != '\r') {
+          currentLine += c;
+        }
+      }
+    }
+    header = "";
+    client.stop();
+  }
+}
