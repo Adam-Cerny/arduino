@@ -1,0 +1,142 @@
+#include <WiFi.h>
+#include <WebServer.h>
+
+const char* ssid = "Cerny";
+const char* password = ""; // Zadejte heslo k Wi-Fi
+
+WebServer server(80); // HTTP server běžící na portu 80
+
+const int relayPin = 1; // Pin, kde je připojeno relé
+
+// Funkce pro zobrazení hlavní stránky
+void handleRoot() {
+  String html = R"rawliteral(
+    <!DOCTYPE html>
+    <html lang="cs">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Ovládání zavlažování</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f4f4f9;
+        }
+        header {
+          background-color: #0078d7;
+          color: white;
+          padding: 1rem 0;
+          text-align: center;
+        }
+        nav {
+          background-color: #005bb5;
+          display: flex;
+          justify-content: center;
+        }
+        nav a {
+          color: white;
+          padding: 1rem;
+          text-decoration: none;
+          font-size: 1.2rem;
+        }
+        nav a:hover {
+          background-color: #004a9f;
+        }
+        section {
+          padding: 2rem;
+          text-align: center;
+        }
+        #control-buttons {
+          margin-top: 2rem;
+        }
+        button {
+          padding: 0.5rem 1rem;
+          margin: 0.5rem;
+          font-size: 1rem;
+          color: white;
+          background-color: #0078d7;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+        button:hover {
+          background-color: #005bb5;
+        }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>Ovládání zavlažování</h1>
+      </header>
+      <nav>
+        <a href="#home">Domů</a>
+        <a href="#project">O projektu</a>
+        <a href="#about">O mně</a>
+        <a href="#control">Ovládání</a>
+      </nav>
+      <section id="home">
+        <h2>Vítejte na stránce</h2>
+        <p>Tato stránka slouží k ovládání zavlažování a zobrazení informací o projektu.</p>
+      </section>
+      <section id="project">
+        <h2>O projektu</h2>
+        <p>Tento projekt je založen na mikrokontroléru ESP32 a umožňuje vzdálené ovládání zavlažování.</p>
+      </section>
+      <section id="about">
+        <h2>O mně</h2>
+        <p>Jsem nadšenec do technologií a tento projekt jsem vytvořil pro učení a zábavu.</p>
+      </section>
+      <section id="control">
+        <h2>Ovládání zavlažování</h2>
+        <div id="control-buttons">
+          <button onclick="fetch('/on')">Zapnout zavlažování</button>
+          <button onclick="fetch('/off')">Vypnout zavlažování</button>
+        </div>
+      </section>
+    </body>
+    </html>
+  )rawliteral";
+  server.send(200, "text/html", html);
+}
+
+// Funkce pro zapnutí zavlažování
+void handleOn() {
+  digitalWrite(relayPin, LOW); // Zapnout relé
+  server.send(200, "text/plain", "Zavlažování zapnuto");
+}
+
+// Funkce pro vypnutí zavlažování
+void handleOff() {
+  digitalWrite(relayPin, HIGH); // Vypnout relé
+  server.send(200, "text/plain", "Zavlažování vypnuto");
+}
+
+void setup() {
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, HIGH); // Relé vypnuto při startu
+
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  Serial.println("Připojování k WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println("\nPřipojeno k WiFi!");
+  Serial.print("IP adresa: ");
+  Serial.println(WiFi.localIP());
+
+  // Nastavení HTTP serveru
+  server.on("/", handleRoot);
+  server.on("/on", handleOn);
+  server.on("/off", handleOff);
+
+  server.begin();
+  Serial.println("Server spuštěn!");
+}
+
+void loop() {
+  server.handleClient();
+}
