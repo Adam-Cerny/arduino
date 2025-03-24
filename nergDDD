@@ -1,0 +1,108 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+const char* ssid = "Cerny";
+const char* password = "";
+const char* server_status = "https://adamcerny.eu/actions/pumps/get_pump.php?pin=";
+const char* server_moisture = "https://adamcerny.eu/actions/sensors/get_sensor.php";
+
+const int moistureSensors[] = {32, 33, 34, 35};  // ADC pins for moisture sensors
+const int pumps[] = {13, 14, 15, 16};  // Pump control pins (same order as sensors)
+const int sensorCount = sizeof(moistureSensors) / sizeof(moistureSensors[0]);
+const int pumpCount = sizeof(pumps) / sizeof(pumps[0]);
+
+void setup() {
+    Serial.begin(115200);
+    WiFi.begin(ssid, password);
+
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 15) {
+        delay(100);
+        Serial.println("Connecting to WiFi...");
+        attempts++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("Connected to WiFi!");
+    } else {
+        Serial.println("Failed to connect to WiFi, restarting...");
+        ESP.restart();  
+    }
+
+    // Set up all pump control pins
+    for (int i = 0; i < pumpCount; i++) {
+        pinMode(pumps[i], OUTPUT);
+    }
+}
+
+void sendMoistureData(int pin, int moistureValue) {
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        http.begin(server_moisture);
+        http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+        String postData = "pin=" + String(pin) + "&status=" + String(moistureValue); // Use pin here instead of sensor_id
+        int httpResponseCode = http.POST(postData);
+        
+        Serial.printf("Sent moisture data: Pin %d, Value %d, Response: %d\n", pin, moistureValue, httpResponseCode);
+        http.end();
+    } else {
+        Serial.println("WiFi disconnected, cannot send data.");
+    }
+}
+
+void checkPumpStatus(int pin) {
+    String url = String(server_status) + String(pin);
+    
+    HTTPClient http;
+    http.begin(url);
+    int httpResponseCode = http.GET();
+
+    if (httpResponseCode > 0) {
+        String payload = http.getString();
+        Serial.printf("Response for pin %d: %s\n", pin, payload.c_str());
+
+        StaticJsonDocument<200> doc;
+        DeserializationError error = deserializeJson(doc, payload);
+
+        if (!error) {
+            int status = doc["status"];
+            Serial.printf("Pin: %d, Status: %d\n", pin, status);
+            digitalWrite(pin, status ? HIGH : LOW);
+        } else {
+            Serial.println("JSON parsing error!");
+        }
+    } else {
+        Serial.printf("Error in HTTP request: %d\n", httpResponseCode);
+    }
+
+    http.end();
+}
+
+void loop() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi disconnected, restarting...");
+        ESP.restart();
+    }
+
+    unsigned long startTime = millis();
+
+    // Iterate over the moisture sensors and handle moisture readings
+    for (int i = 0; i < sensorCount; i++) {
+        int pin = moistureSensors[i];  // Use the actual pin numbers here
+        int moistureValue = analogRead(pin);  
+        
+        moistureValue = map(moistureValue, 0, 4095, 100, 0);  // Convert to 0-100%
+        sendMoistureData(pin, moistureValue);  // Send moisture data using the pin
+    }
+
+    // Iterate over the pump control pins and check their status
+    for (int i = 0; i < pumpCount; i++) {
+        checkPumpStatus(pumps[i]);  // Check status for all pumps
+        delay(10);  // Wait a bit between checking different pumps
+    }
+
+    Serial.printf("Loop time: %lu ms\n", millis() - startTime);
+    delay(10);  // Delay before the next cycle
+}
